@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Free browser-based topographic joy plot generator. Select any location on Earth, fetch real elevation data, customize ridgeline style, and export as SVG, PNG, or JPG.">
+<meta property="og:title" content="Contourist — Topographic Joy Plot Generator">
+<meta property="og:description" content="Create beautiful ridge plots from real-world terrain data. Select a location, adjust parameters, and export print-quality art.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://null-jones.github.io/contourist/">
+<meta property="og:image" content="https://null-jones.github.io/contourist/logo.svg">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Contourist — Topographic Joy Plot Generator">
+<meta name="twitter:description" content="Create beautiful ridge plots from real-world terrain data.">
+<link rel="canonical" href="https://null-jones.github.io/contourist/">
+<title>Contourist — Topographic Joy Plot Generator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Raleway:wght@400;700&family=Lora:wght@400;700&family=Oswald:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Roboto+Slab:wght@400;700&family=Bebas+Neue&family=Crimson+Text:wght@400;700&family=Space+Mono:wght@400;700&family=Tourney:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="brand">
+      <img src="logo.svg" alt="Contourist" class="brand-logo">
+      <div class="brand-text">
+        <h1>Contourist</h1>
+        <p>Topographic Joy Plot Generator</p>
+      </div>
+      <a href="https://github.com/null-jones/contourist" target="_blank" rel="noopener" class="brand-github" title="View on GitHub">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <div class="sidebar-scroll">
+    <!-- How-to -->
+    <div class="howto">
+      <strong>How to use</strong>
+      <ol>
+        <li>Pick a <strong>preset</strong> (auto-fetches) or draw a box on the map with <strong>Shift + drag</strong>, then click <strong>Fetch Elevation Data</strong></li>
+        <li>Adjust the <strong>zoom level</strong> for more or less terrain detail</li>
+        <li>Tweak layout, stroke, and style controls</li>
+        <li>Export as <strong>SVG</strong>, <strong>PNG</strong>, or <strong>JPG</strong></li>
+      </ol>
+      <br>
+      <strong>About the data</strong><br>
+      Elevation data comes from <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener" style="color:var(--accent);">AWS Terrain Tiles</a> a free, open, global elevation dataset.
+    </div>
+
+    <!-- Location -->
+    <div class="section">
+      <div class="section-title">Location</div>
+      <div id="location-map"></div>
+      <p class="map-hint">Shift + drag to draw a selection box. Pan and zoom normally, or use presets / coordinates below.</p>
+      <div class="section-title" style="margin-top:4px;">Presets</div>
+      <div class="preset-grid">
+        <button class="preset-btn" data-preset="banff">Banff</button>
+        <button class="preset-btn" data-preset="everest">Mt Everest</button>
+        <button class="preset-btn" data-preset="crater-lake">Crater Lake</button>
+        <button class="preset-btn" data-preset="fjords">Norwegian Fjords</button>
+        <button class="preset-btn" data-preset="innsbruck">Innsbruck</button>
+        <button class="preset-btn" data-preset="sossusvlei">Sossusvlei</button>
+      </div>
+      <div class="coord-grid">
+        <div>
+          <label>South Lat</label>
+          <input type="number" id="lat-south" value="51.1" step="0.01">
+        </div>
+        <div>
+          <label>North Lat</label>
+          <input type="number" id="lat-north" value="51.3" step="0.01">
+        </div>
+        <div>
+          <label>West Lng</label>
+          <input type="number" id="lng-west" value="-115.75" step="0.01">
+        </div>
+        <div>
+          <label>East Lng</label>
+          <input type="number" id="lng-east" value="-115.4" step="0.01">
+        </div>
+      </div>
+      <div class="control" style="margin-top:10px;">
+        <label>Zoom Level <span class="value" id="val-zoom">11</span></label>
+        <span class="tooltip">Higher zoom = more terrain detail but more tiles to fetch</span>
+        <input type="range" id="zoom" min="7" max="14" value="11" step="1">
+      </div>
+      <button class="btn btn-primary" id="btn-fetch" style="margin-top:8px;">Fetch Elevation Data</button>
+      <div id="api-status" style="font-size:12px; margin-top:8px; color:var(--text-dim);"></div>
+    </div>
+
+    <!-- Title & Subtitle -->
+    <div class="section">
+      <div class="section-title">Title &amp; Subtitle</div>
+      <div class="control">
+        <label>Title</label>
+        <input type="text" id="titleText" placeholder="e.g. Grand Canyon" value="">
+      </div>
+      <div class="control">
+        <label>Subtitle</label>
+        <div class="input-with-btn">
+          <input type="text" id="subtitleText" placeholder="e.g. 36°N, 112°W" value="">
+          <button type="button" id="btn-auto-coords" class="inline-btn" title="Auto-fill center coordinates from map">&#x1f4cd;</button>
+        </div>
+      </div>
+      <div class="control">
+        <label>Font</label>
+        <select id="titleFont">
+          <option value="'Bebas Neue', sans-serif" style="font-family:'Bebas Neue',sans-serif">Bebas Neue</option>
+          <option value="'Playfair Display', serif" style="font-family:'Playfair Display',serif">Playfair Display</option>
+          <option value="'Raleway', sans-serif" style="font-family:'Raleway',sans-serif">Raleway</option>
+          <option value="'Lora', serif" style="font-family:'Lora',serif">Lora</option>
+          <option value="'Oswald', sans-serif" style="font-family:'Oswald',sans-serif">Oswald</option>
+          <option value="'Merriweather', serif" style="font-family:'Merriweather',serif">Merriweather</option>
+          <option value="'Montserrat', sans-serif" style="font-family:'Montserrat',sans-serif">Montserrat</option>
+          <option value="'Roboto Slab', serif" style="font-family:'Roboto Slab',serif">Roboto Slab</option>
+          <option value="'Crimson Text', serif" style="font-family:'Crimson Text',serif">Crimson Text</option>
+          <option value="'Space Mono', monospace" style="font-family:'Space Mono',monospace">Space Mono</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>Title Position</label>
+        <select id="titlePosition">
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+        </select>
+      </div>
+      <div class="row-2">
+        <div class="control">
+          <label>Title Size <span class="value" id="val-titleSize">32</span></label>
+          <input type="range" id="titleSize" min="12" max="72" value="32" step="1">
+        </div>
+        <div class="control">
+          <label>Sub Size <span class="value" id="val-subtitleSize">16</span></label>
+          <input type="range" id="subtitleSize" min="8" max="48" value="16" step="1">
+        </div>
+      </div>
+      <div class="control">
+        <label>Title Color</label>
+        <input type="color" id="titleColor" value="#ffffff">
+      </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="section">
+      <div class="section-title">Layout</div>
+      <div class="control">
+        <label>Number of Lines <span class="value" id="val-numLines">60</span></label>
+        <span class="tooltip">How many horizontal ridgelines to draw across the terrain</span>
+        <input type="range" id="numLines" min="10" max="150" value="60" step="1">
+      </div>
+      <div class="control">
+        <label>Samples per Line <span class="value" id="val-samplesPerLine">350</span></label>
+        <span class="tooltip">Data points along each ridgeline, higher = more detailed curves</span>
+        <input type="range" id="samplesPerLine" min="50" max="500" value="350" step="10">
+      </div>
+      <div class="control">
+        <label>Line Spacing <span class="value" id="val-lineSpacing">12</span></label>
+        <span class="tooltip">Vertical distance (px) between each ridgeline baseline</span>
+        <input type="range" id="lineSpacing" min="1" max="20" value="12" step="0.5">
+      </div>
+      <div class="control">
+        <label>Amplitude <span class="value" id="val-amplitude">125</span></label>
+        <span class="tooltip">Max peak height (px) — how dramatically ridges rise above the baseline</span>
+        <input type="range" id="amplitude" min="5" max="200" value="125" step="1">
+      </div>
+      <div class="control">
+        <label>Transect Angle <span class="value" id="val-transectAngle">0°</span></label>
+        <span class="tooltip">Rotation of the cross-section slices: 0° = east–west, 90° = north–south</span>
+        <input type="range" id="transectAngle" min="0" max="180" value="0" step="1">
+      </div>
+    </div>
+
+    <!-- Stroke & Fill -->
+    <div class="section">
+      <div class="section-title">Stroke &amp; Fill</div>
+      <div class="control">
+        <label>Stroke Width <span class="value" id="val-strokeWidth">1.2</span></label>
+        <input type="range" id="strokeWidth" min="0.2" max="4" value="1.2" step="0.1">
+      </div>
+      <div class="control">
+        <label>Fill Opacity <span class="value" id="val-fillOpacity">1.0</span></label>
+        <span class="tooltip">Controls how much each ridge occludes the ones behind it</span>
+        <input type="range" id="fillOpacity" min="0" max="1" value="1" step="0.05">
+      </div>
+      <div class="control">
+        <label>Smoothing <span class="value" id="val-smoothing">2</span></label>
+        <span class="tooltip">Moving-average kernel size — higher = softer terrain</span>
+        <input type="range" id="smoothing" min="0" max="20" value="2" step="1">
+      </div>
+      <div class="row-2">
+        <div class="control">
+          <label>Line Color</label>
+          <input type="color" id="lineColor" value="#ffffff">
+        </div>
+        <div class="control">
+          <label>Background</label>
+          <input type="color" id="bgColor" value="#000000">
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="section">
+      <div class="section-title">Advanced</div>
+      <div class="control">
+        <label>Interpolation</label>
+        <span class="tooltip">How points along each ridge are connected</span>
+        <select id="interpolation">
+          <option value="smooth">Smooth (Bezier)</option>
+          <option value="linear">Linear</option>
+          <option value="step">Step</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>Horizontal Offset <span class="value" id="val-hOffset">0</span></label>
+        <span class="tooltip">Shift each successive line sideways to create a perspective / 3D effect</span>
+        <input type="range" id="hOffset" min="-20" max="20" value="0" step="0.5">
+      </div>
+      <div class="control">
+        <label>Padding (px) <span class="value" id="val-margin">60</span></label>
+        <span class="tooltip">Inner spacing between canvas edge and plot content</span>
+        <input type="range" id="margin" min="10" max="150" value="60" step="5">
+      </div>
+      <div class="control">
+        <label>Inset (px) <span class="value" id="val-borderWidth">20</span></label>
+        <span class="tooltip">Clip region inset from canvas edge for a framed poster look</span>
+        <input type="range" id="borderWidth" min="0" max="80" value="20" step="1">
+      </div>
+      <div class="row-2">
+        <div class="control">
+          <label>X Offset <span class="value" id="val-plotOffsetX">0</span></label>
+          <input type="range" id="plotOffsetX" min="-400" max="400" value="0" step="5">
+        </div>
+        <div class="control">
+          <label>Y Offset <span class="value" id="val-plotOffsetY">0</span></label>
+          <input type="range" id="plotOffsetY" min="-400" max="400" value="0" step="5">
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-reset" style="margin-top:4px;">Reset to Defaults</button>
+    </div>
+
+    <!-- Canvas Size -->
+    <div class="section">
+      <div class="section-title">Canvas Size</div>
+      <div class="size-presets">
+        <button class="size-preset-btn" data-w="800" data-h="1000">800 &times; 1000</button>
+        <button class="size-preset-btn" data-w="1080" data-h="1080">1080 &times; 1080</button>
+        <button class="size-preset-btn" data-w="1080" data-h="1350">1080 &times; 1350</button>
+        <button class="size-preset-btn" data-w="1920" data-h="1080">1920 &times; 1080</button>
+        <button class="size-preset-btn" data-w="2480" data-h="3508">A4 Print</button>
+        <button class="size-preset-btn" data-w="3508" data-h="2480">A4 Landscape</button>
+      </div>
+      <div class="control">
+        <label>Width <span class="value" id="val-canvasW">800</span></label>
+        <input type="range" id="canvasW" min="400" max="4000" value="800" step="10">
+      </div>
+      <div class="control">
+        <label>Height <span class="value" id="val-canvasH">1000</span></label>
+        <input type="range" id="canvasH" min="400" max="4000" value="1000" step="10">
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="section-title" style="margin-bottom:8px;">Export</div>
+    <div class="export-row">
+      <button class="btn btn-primary" id="btn-export-svg">SVG</button>
+      <button class="btn btn-primary" id="btn-export-png">PNG</button>
+      <button class="btn btn-primary" id="btn-export-jpg">JPG</button>
+    </div>
+    <div class="export-scale">
+      <label>Resolution
+        <select id="exportScale">
+          <option value="1">1x</option>
+          <option value="2" selected>2x</option>
+          <option value="3">3x</option>
+          <option value="4">4x</option>
+        </select>
+      </label>
+    </div>
+    <div class="footer-attr">Made with &lt;3 by <a href="https://github.com/null-jones" target="_blank" rel="noopener">null-jones</a></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+  <div id="preview-container"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

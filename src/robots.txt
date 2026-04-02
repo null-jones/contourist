@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://null-jones.github.io/contourist/sitemap.xml

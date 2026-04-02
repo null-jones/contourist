@@ -1,0 +1,20 @@
+# Contourist
+
+> Contourist is a free, browser-based topographic joy plot generator. It fetches real-world elevation data from AWS Terrain Tiles and renders interactive, customizable ridge plots inspired by the Joy Division "Unknown Pleasures" album cover. Users can select any location on Earth, adjust layout, stroke, and style parameters in real time, and export the result as SVG, PNG, or JPG.
+
+## Features
+
+- Interactive map for selecting any geographic bounding box
+- Real elevation data via AWS Terrain Tiles (Terrarium encoding)
+- Adjustable ridgeline count, spacing, amplitude, smoothing, and transect angle
+- Google Fonts support for title and subtitle text
+- Multiple interpolation modes (smooth Bezier, linear, step)
+- Export as SVG (vector), PNG (transparent), or JPG at 1x–4x resolution
+- Canvas size presets (Instagram, HD, A4, etc.)
+- No backend required — runs entirely in the browser
+
+## Links
+
+- Source: https://github.com/null-jones/contourist
+- Live: https://null-jones.github.io/contourist/
+- Data: https://registry.opendata.aws/terrain-tiles/
