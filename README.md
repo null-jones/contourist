@@ -14,6 +14,10 @@
   <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/null-jones/contourist?style=flat-square&color=16213e">
 </p>
 
+<p align="center">
+  <img src="assets/contourist_example.gif" alt="Example gif of contourist running"/>
+</p>
+
 ---
 
 ## What is this?
