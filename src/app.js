@@ -2,6 +2,16 @@
 let currentData = null; // { grid: Float64Array[], rows, cols }
 let debounceTimer = null;
 
+// Persistent SVG DOM references (for animated transitions)
+let svgRoot = null;
+let bgRect = null;
+let clipRect = null;
+let ridgeGroup = null;
+let titleGroup = null;
+let prevInterpolation = null;
+let prevSamplesPerLine = null;
+let prevNumLines = null;
+
 // ───────────── DOM refs ─────────────
 const $ = (sel) => document.querySelector(sel);
 const preview = $('#preview-container');
@@ -271,14 +281,13 @@ function buildStepPath(points) {
 }
 
 // ───────────── Render ─────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 /**
- * Main render function. Resamples elevation data, applies smoothing,
- * computes auto-scaling to fit canvas, skips flat rows (variance < 0.005),
- * and builds the SVG with separate fill polygons (occlusion) and stroke paths.
- * The +2px on closePath baseline prevents sub-pixel gaps between fill polygons.
+ * Compute ridge path data from current parameters and elevation data.
+ * Pure function — no DOM side effects.
  */
-function render() {
-  const p = params();
+function computeRidgeData(p) {
   const W = p.canvasW;
   const H = p.canvasH;
   const marginPx = p.margin;
@@ -288,29 +297,15 @@ function render() {
   const lineSpacing = p.lineSpacing;
   const amplitude = p.amplitude;
 
-  // If no data loaded, show placeholder
-  if (!currentData) {
-    preview.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-      <rect width="${W}" height="${H}" fill="${p.bgColor}"/>
-      <text x="${W/2}" y="${H/2}" text-anchor="middle" fill="${p.lineColor}" font-size="18" font-family="${p.titleFont}" opacity="0.4">Select a location and fetch elevation data</text>
-    </svg>`;
-    return;
-  }
-
-  // Resample source data to match current line/sample settings (with rotation)
   const data = normalizeGrid(resampleGrid(currentData, numLines, samplesPerLine, p.transectAngle));
-
-  // Apply smoothing
   const smoothed = data.grid.map(row => smoothRow(row, Math.round(p.smoothing)));
 
-  // ── Compute title block height ──
   const titlePos = p.titlePosition || 'top';
   let titleBlockH = 0;
   if (p.titleText)    titleBlockH += p.titleSize * 1.3;
   if (p.subtitleText) titleBlockH += p.subtitleSize * 1.3;
   if (titleBlockH > 0) titleBlockH += 10;
 
-  // ── Compute natural plot height, then scale to fit canvas ──
   const totalBaselineSpan = (numLines - 1) * lineSpacing;
   const naturalPlotH = totalBaselineSpan + amplitude;
   const availableH = H - 2 * marginPx - titleBlockH;
@@ -320,7 +315,6 @@ function render() {
   const scaledSpacing = lineSpacing * scaleFactor;
   const scaledPlotH = (numLines - 1) * scaledSpacing + scaledAmplitude;
 
-  // Center vertically in available area, then apply manual offset
   const titleAbove = titlePos === 'top' ? titleBlockH : 0;
   const topOffset = marginPx + titleAbove
     + Math.max(0, (availableH - scaledPlotH) / 2)
@@ -330,9 +324,8 @@ function render() {
                     : p.interpolation === 'step' ? buildStepPath
                     : buildLinearPath;
 
-  let paths = '';
+  const ridges = [];
   for (let r = 0; r < numLines; r++) {
-    // Skip flat rows (rivers, ocean, tile gaps)
     const rowData = smoothed[r];
     let rMin = rowData[0], rMax = rowData[0];
     for (let i = 1; i < rowData.length; i++) {
@@ -355,58 +348,241 @@ function render() {
     const firstPt = points[0];
     const closePath = ` L ${lastPt[0].toFixed(2)} ${(baseY + 2).toFixed(2)} L ${firstPt[0].toFixed(2)} ${(baseY + 2).toFixed(2)} Z`;
 
-    // Fill polygon (occludes lines behind) — no stroke
-    paths += `<path d="${ridgePath}${closePath}" fill="${p.bgColor}" fill-opacity="${p.fillOpacity}" stroke="none"/>`;
-    // Ridge line only — no fill
-    paths += `<path d="${ridgePath}" fill="none" stroke="${p.lineColor}" stroke-width="${p.strokeWidth}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    ridges.push({ fillD: ridgePath + closePath, strokeD: ridgePath });
+  }
+  return ridges;
+}
+
+/**
+ * Create or update the persistent SVG skeleton.
+ * Returns true if the SVG was newly created.
+ */
+function ensureSVGStructure(p) {
+  const W = p.canvasW;
+  const H = p.canvasH;
+  const borderW = p.borderWidth || 0;
+
+  if (!svgRoot || !preview.contains(svgRoot)) {
+    // Create the SVG structure from scratch
+    svgRoot = document.createElementNS(SVG_NS, 'svg');
+    svgRoot.setAttribute('xmlns', SVG_NS);
+
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    const cp = document.createElementNS(SVG_NS, 'clipPath');
+    cp.setAttribute('id', 'inner-clip');
+    clipRect = document.createElementNS(SVG_NS, 'rect');
+    cp.appendChild(clipRect);
+    defs.appendChild(cp);
+    svgRoot.appendChild(defs);
+
+    bgRect = document.createElementNS(SVG_NS, 'rect');
+    bgRect.setAttribute('id', 'bg-rect');
+    svgRoot.appendChild(bgRect);
+
+    ridgeGroup = document.createElementNS(SVG_NS, 'g');
+    ridgeGroup.setAttribute('id', 'ridge-group');
+    ridgeGroup.setAttribute('clip-path', 'url(#inner-clip)');
+    svgRoot.appendChild(ridgeGroup);
+
+    titleGroup = document.createElementNS(SVG_NS, 'g');
+    titleGroup.setAttribute('id', 'title-group');
+    svgRoot.appendChild(titleGroup);
+
+    preview.innerHTML = '';
+    preview.appendChild(svgRoot);
   }
 
-  // Title and subtitle
-  let titleSvg = '';
+  // Update SVG dimensions
+  svgRoot.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgRoot.setAttribute('width', W);
+  svgRoot.setAttribute('height', H);
+
+  // Update background
+  bgRect.setAttribute('width', W);
+  bgRect.setAttribute('height', H);
+  bgRect.setAttribute('fill', p.bgColor);
+
+  // Update clip rect
+  clipRect.setAttribute('x', borderW);
+  clipRect.setAttribute('y', borderW);
+  clipRect.setAttribute('width', W - 2 * borderW);
+  clipRect.setAttribute('height', H - 2 * borderW);
+}
+
+/**
+ * Reconcile persistent path elements with new ridge data.
+ * Updates existing paths in place (CSS transitions animate the changes),
+ * adds new paths or removes surplus ones as needed.
+ */
+function reconcileRidgePaths(ridgeData, p) {
+  const existingPairs = ridgeGroup.children.length / 2;
+  const needed = ridgeData.length;
+
+  // Update existing path pairs
+  for (let i = 0; i < Math.min(existingPairs, needed); i++) {
+    const fillPath = ridgeGroup.children[i * 2];
+    const strokePath = ridgeGroup.children[i * 2 + 1];
+    fillPath.setAttribute('d', ridgeData[i].fillD);
+    fillPath.setAttribute('fill', p.bgColor);
+    fillPath.setAttribute('fill-opacity', p.fillOpacity);
+    fillPath.style.opacity = '1';
+    strokePath.setAttribute('d', ridgeData[i].strokeD);
+    strokePath.setAttribute('stroke', p.lineColor);
+    strokePath.setAttribute('stroke-width', p.strokeWidth);
+    strokePath.style.opacity = '1';
+  }
+
+  // Add new path pairs if we need more
+  for (let i = existingPairs; i < needed; i++) {
+    const fillPath = document.createElementNS(SVG_NS, 'path');
+    fillPath.setAttribute('d', ridgeData[i].fillD);
+    fillPath.setAttribute('fill', p.bgColor);
+    fillPath.setAttribute('fill-opacity', p.fillOpacity);
+    fillPath.setAttribute('stroke', 'none');
+    fillPath.style.opacity = '0';
+    ridgeGroup.appendChild(fillPath);
+
+    const strokePath = document.createElementNS(SVG_NS, 'path');
+    strokePath.setAttribute('d', ridgeData[i].strokeD);
+    strokePath.setAttribute('fill', 'none');
+    strokePath.setAttribute('stroke', p.lineColor);
+    strokePath.setAttribute('stroke-width', p.strokeWidth);
+    strokePath.setAttribute('stroke-linejoin', 'round');
+    strokePath.setAttribute('stroke-linecap', 'round');
+    strokePath.style.opacity = '0';
+    ridgeGroup.appendChild(strokePath);
+
+    // Fade in on next frame
+    requestAnimationFrame(() => {
+      fillPath.style.opacity = '1';
+      strokePath.style.opacity = '1';
+    });
+  }
+
+  // Remove surplus path pairs (fade out then remove)
+  while (ridgeGroup.children.length > needed * 2) {
+    ridgeGroup.removeChild(ridgeGroup.lastChild);
+  }
+}
+
+/**
+ * Update title and subtitle text elements.
+ */
+function updateTitles(p) {
+  const W = p.canvasW;
+  const H = p.canvasH;
+  const marginPx = p.margin;
+  const titlePos = p.titlePosition || 'top';
   const titleX = W / 2;
-  const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // Clear and rebuild title group (text content doesn't benefit from transitions)
+  titleGroup.innerHTML = '';
 
   let titleY;
   if (titlePos === 'top') {
     titleY = marginPx;
     if (p.titleText) {
       titleY += p.titleSize;
-      titleSvg += `<text x="${titleX}" y="${titleY}" text-anchor="middle" fill="${p.titleColor}" font-size="${p.titleSize}" font-family="${p.titleFont}" font-weight="700">${esc(p.titleText)}</text>`;
+      const el = document.createElementNS(SVG_NS, 'text');
+      el.setAttribute('x', titleX);
+      el.setAttribute('y', titleY);
+      el.setAttribute('text-anchor', 'middle');
+      el.setAttribute('fill', p.titleColor);
+      el.setAttribute('font-size', p.titleSize);
+      el.setAttribute('font-family', p.titleFont);
+      el.setAttribute('font-weight', '700');
+      el.textContent = p.titleText;
+      titleGroup.appendChild(el);
     }
     if (p.subtitleText) {
       titleY += p.subtitleSize * 1.3 + 4;
-      titleSvg += `<text x="${titleX}" y="${titleY}" text-anchor="middle" fill="${p.titleColor}" font-size="${p.subtitleSize}" font-family="${p.titleFont}" opacity="0.7">${esc(p.subtitleText)}</text>`;
+      const el = document.createElementNS(SVG_NS, 'text');
+      el.setAttribute('x', titleX);
+      el.setAttribute('y', titleY);
+      el.setAttribute('text-anchor', 'middle');
+      el.setAttribute('fill', p.titleColor);
+      el.setAttribute('font-size', p.subtitleSize);
+      el.setAttribute('font-family', p.titleFont);
+      el.setAttribute('opacity', '0.7');
+      el.textContent = p.subtitleText;
+      titleGroup.appendChild(el);
     }
   } else {
-    // Bottom placement — position below the plot
     titleY = H - marginPx;
     if (p.subtitleText) {
-      titleSvg += `<text x="${titleX}" y="${titleY}" text-anchor="middle" fill="${p.titleColor}" font-size="${p.subtitleSize}" font-family="${p.titleFont}" opacity="0.7">${esc(p.subtitleText)}</text>`;
+      const el = document.createElementNS(SVG_NS, 'text');
+      el.setAttribute('x', titleX);
+      el.setAttribute('y', titleY);
+      el.setAttribute('text-anchor', 'middle');
+      el.setAttribute('fill', p.titleColor);
+      el.setAttribute('font-size', p.subtitleSize);
+      el.setAttribute('font-family', p.titleFont);
+      el.setAttribute('opacity', '0.7');
+      el.textContent = p.subtitleText;
+      titleGroup.appendChild(el);
       titleY -= p.subtitleSize * 1.3 + 4;
     }
     if (p.titleText) {
-      titleSvg += `<text x="${titleX}" y="${titleY}" text-anchor="middle" fill="${p.titleColor}" font-size="${p.titleSize}" font-family="${p.titleFont}" font-weight="700">${esc(p.titleText)}</text>`;
+      const el = document.createElementNS(SVG_NS, 'text');
+      el.setAttribute('x', titleX);
+      el.setAttribute('y', titleY);
+      el.setAttribute('text-anchor', 'middle');
+      el.setAttribute('fill', p.titleColor);
+      el.setAttribute('font-size', p.titleSize);
+      el.setAttribute('font-family', p.titleFont);
+      el.setAttribute('font-weight', '700');
+      el.textContent = p.titleText;
+      titleGroup.appendChild(el);
     }
   }
+}
 
-  const borderW = p.borderWidth || 0;
-  const innerX = borderW;
-  const innerY = borderW;
-  const innerW = W - 2 * borderW;
-  const innerH = H - 2 * borderW;
+/**
+ * Main render function. Uses persistent SVG DOM elements so CSS transitions
+ * animate path changes smoothly when parameters are adjusted.
+ */
+function render() {
+  const p = params();
+  const W = p.canvasW;
+  const H = p.canvasH;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-  <defs>
-    <clipPath id="inner-clip"><rect x="${innerX}" y="${innerY}" width="${innerW}" height="${innerH}"/></clipPath>
-  </defs>
-  <rect width="${W}" height="${H}" fill="${p.bgColor}"/>
-  <g clip-path="url(#inner-clip)">
-  ${paths}
-  </g>
-  ${titleSvg}
-</svg>`;
+  // If no data loaded, show placeholder (non-persistent)
+  if (!currentData) {
+    svgRoot = null;
+    preview.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+      <rect width="${W}" height="${H}" fill="${p.bgColor}"/>
+      <text x="${W/2}" y="${H/2}" text-anchor="middle" fill="${p.lineColor}" font-size="18" font-family="${p.titleFont}" opacity="0.4">Select a location and fetch elevation data</text>
+    </svg>`;
+    return;
+  }
 
-  preview.innerHTML = svg;
+  const ridgeData = computeRidgeData(p);
+  ensureSVGStructure(p);
+
+  // Detect structural changes that prevent CSS d interpolation
+  const curInterp = p.interpolation;
+  const curSamples = Math.round(p.samplesPerLine);
+  const curNumLines = Math.round(p.numLines);
+  const structChanged = prevInterpolation !== null && (
+    curInterp !== prevInterpolation ||
+    curSamples !== prevSamplesPerLine ||
+    curNumLines !== prevNumLines
+  );
+
+  if (structChanged) {
+    ridgeGroup.classList.add('no-transition');
+  }
+
+  reconcileRidgePaths(ridgeData, p);
+  updateTitles(p);
+
+  prevInterpolation = curInterp;
+  prevSamplesPerLine = curSamples;
+  prevNumLines = curNumLines;
+
+  if (structChanged) {
+    requestAnimationFrame(() => ridgeGroup.classList.remove('no-transition'));
+  }
 }
 
 function scheduleRender() {
@@ -818,9 +994,9 @@ async function exportRaster(format) {
 $('#btn-export-png').addEventListener('click', () => exportRaster('png'));
 $('#btn-export-jpg').addEventListener('click', () => exportRaster('jpeg'));
 
-// ───────────── Loading overlay ─────────────
+// ───────────── Loading indicator ─────────────
 function showLoading(show) {
-  $('#loading').classList.toggle('active', show);
+  $('#fetch-loading').style.display = show ? 'flex' : 'none';
 }
 
 // ───────────── Zoom display ─────────────

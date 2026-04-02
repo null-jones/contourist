@@ -307,24 +307,34 @@ body {
   max-height: 100%;
   filter: drop-shadow(0 4px 30px rgba(0,0,0,0.3));
 }
-
-/* Loading overlay */
-.loading-overlay {
-  display: none;
-  position: absolute;
-  inset: 0;
-  background: rgba(26, 26, 46, 0.85);
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
+#ridge-group path {
+  transition: d 0.25s ease-out, opacity 0.25s ease-out,
+              stroke 0.25s ease-out, stroke-width 0.25s ease-out,
+              fill 0.25s ease-out, fill-opacity 0.25s ease-out;
 }
-.loading-overlay.active { display: flex; }
-.spinner {
-  width: 40px; height: 40px;
-  border: 3px solid var(--panel-border);
+#ridge-group.no-transition path {
+  transition: none;
+}
+#bg-rect {
+  transition: fill 0.25s ease-out;
+}
+
+/* Sidebar fetch loading indicator */
+.fetch-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.spinner-sm {
+  width: 18px; height: 18px;
+  border: 2px solid var(--panel-border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 

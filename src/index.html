@@ -91,6 +91,7 @@
         <input type="range" id="zoom" min="7" max="14" value="11" step="1">
       </div>
       <button class="btn btn-primary" id="btn-fetch" style="margin-top:8px;">Fetch Elevation Data</button>
+      <div id="fetch-loading" class="fetch-loading" style="display:none;"><div class="spinner-sm"></div><span>Fetching tiles&hellip;</span></div>
       <div id="api-status" style="font-size:12px; margin-top:8px; color:var(--text-dim);"></div>
     </div>
 
@@ -289,7 +290,6 @@
 </div>
 
 <div class="main">
-  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
   <div id="preview-container"></div>
 </div>
 
