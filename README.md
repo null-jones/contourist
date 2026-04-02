@@ -5,17 +5,17 @@
 <h1 align="center">Contourist</h1>
 
 <p align="center">
+  <img src="assets/contourist_example.gif" alt="Example gif of contourist running"/>
+</p>
+
+<p align="center">
   A browser-based topographic joy plot generator.
-  <br>Pick a spot on Earth, pull real elevation data, tweak it until it looks cool, and export.
+  <br>Pick a spot on Earth, pull real elevation data, tweak settings, and export.
 </p>
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/github/license/null-jones/contourist?style=flat-square&color=0f3460">
   <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/null-jones/contourist?style=flat-square&color=16213e">
-</p>
-
-<p align="center">
-  <img src="assets/contourist_example.gif" alt="Example gif of contourist running"/>
 </p>
 
 ---

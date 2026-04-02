@@ -418,3 +418,102 @@ body {
 }
 .size-preset-btn:hover { border-color: var(--accent); color: var(--accent); }
 .size-preset-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.1); }
+
+/* ── Mobile tab bar (hidden on desktop) ── */
+.mobile-tab-bar {
+  display: none;
+}
+
+/* ── Mobile / narrow screens ── */
+@media (max-width: 768px) {
+  body {
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+    min-height: 0;
+    border-right: none;
+  }
+
+  /* Toggle visibility via body classes */
+  body.mobile-show-preview .sidebar { display: none; }
+  body.mobile-show-controls .main   { display: none; }
+
+  .sidebar-header {
+    padding: 14px 16px;
+  }
+
+  .sidebar-scroll {
+    padding: 12px 16px;
+  }
+
+  .sidebar-footer {
+    padding: 12px 16px;
+  }
+
+  #location-map {
+    height: 220px;
+  }
+
+  .main {
+    flex: 1;
+    min-height: 0;
+  }
+
+  #preview-container {
+    padding: 16px;
+  }
+
+  .howto {
+    padding: 10px 12px;
+  }
+
+  /* Tab bar */
+  .mobile-tab-bar {
+    display: flex;
+    border-top: 1px solid var(--panel-border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .mobile-tab {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color 0.2s, box-shadow 0.2s;
+  }
+  .mobile-tab.active {
+    color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  /* Notification dot on Preview tab */
+  .tab-dot {
+    display: none;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tab-dot.visible {
+    display: inline-block;
+    animation: dot-pulse 1s ease-in-out 3;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.4); }
+  }
+}

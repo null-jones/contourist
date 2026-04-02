@@ -587,7 +587,19 @@ function render() {
 
 function scheduleRender() {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(render, 30);
+  debounceTimer = setTimeout(() => {
+    render();
+    // Show notification dot on Preview tab if controls panel is active on mobile
+    if (document.body.classList.contains('mobile-show-controls')) {
+      const dot = $('#preview-dot');
+      if (dot) {
+        dot.classList.remove('visible');
+        // Force reflow to restart the animation
+        void dot.offsetWidth;
+        dot.classList.add('visible');
+      }
+    }
+  }, 30);
 }
 
 // ───────────── Elevation via Terrain RGB Tiles ─────────────
@@ -1003,6 +1015,31 @@ function showLoading(show) {
 $('#zoom').addEventListener('input', () => {
   $('#val-zoom').textContent = $('#zoom').value;
 });
+
+// ───────────── Mobile tab switching ─────────────
+document.querySelectorAll('.mobile-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    document.body.classList.toggle('mobile-show-controls', target === 'controls');
+    document.body.classList.toggle('mobile-show-preview', target === 'preview');
+    // Clear the notification dot when switching to preview
+    if (target === 'preview') {
+      const dot = $('#preview-dot');
+      if (dot) dot.classList.remove('visible');
+    }
+    // Leaflet needs a nudge after its container becomes visible
+    if (target === 'controls' && leafletMap) {
+      setTimeout(() => leafletMap.invalidateSize(), 50);
+    }
+  });
+});
+
+// Default to controls on mobile
+if (window.matchMedia('(max-width: 768px)').matches) {
+  document.body.classList.add('mobile-show-controls');
+}
 
 // ───────────── Init map immediately ─────────────
 setTimeout(() => { initMap(); }, 100);
